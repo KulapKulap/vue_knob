@@ -1,0 +1,33 @@
+favorite() {
+        this.favs.push({
+        'from': this.cryptoFirst,
+        'to': this.cryptoSecond
+      });
+    }
+
+
+----
+
+    <video controls>
+      <source src="assets/videos/preview.MOV" type="video/quicktime"> 
+    </video>
+--------
+
+
+
+import { fileURLToPath, URL } from 'node:url'
+
+import { defineConfig } from 'vite'
+import vue from '@vitejs/plugin-vue'
+
+// https://vitejs.dev/config/
+export default defineConfig({
+  plugins: [
+    vue(),
+  ],
+  resolve: {
+    alias: {
+      '@': fileURLToPath(new URL('./src', import.meta.url))
+    }
+  }
+})
