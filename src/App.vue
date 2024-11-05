@@ -1,197 +1,128 @@
 <template>
-  <div class="wrapper">
-    <!-- <h1>Crypto<b style="opacity:1 !important">X</b>change</h1>  -->
-  
-    <video autoplay muted>
-      <source src="/Users/jinhua/Desktop/PROJECTS_20240521/vue_bitcoin/vue_bitcoin/src/assets/videos/preview.mp4" type="video/quicktime"> 
-    </video>
-    <div class="wrapper-inner">
-      <div class="wrapper-inner-input">
-        <Input :changeAmount="changeAmount" :convert="convert" :favorite="favorite" :error="error"/>
-        <Favorite :favs="favs" v-if="favs.length > 0" :getFromFavs="getFromFavs"/>
-      </div>
-      <p v-if="error != ''">{{ error }}</p>
-      <p v-if="result != 0">{{ result }}</p>
-      <div class="selectors">
-        <Selector :setCrypto="setCryptoFirst" :cryptoNow="cryptoFirst"/>
-        <Selector :setCrypto="setCryptoSecond" :cryptoNow="cryptoSecond"/>
-      </div>
-    </div>
+  <div
+    class="knob"
+    :style="{
+      width: size + 'px',
+      height: size + 'px',
+    }"
+    @mousedown="startDrag"
+    @touchstart="startDrag"
+  >
+    <!-- Circular Progress -->
+    <svg
+      class="knob-circle"
+      :width="size"
+      :height="size"
+      viewBox="0 0 100 100"
+    >
+      <circle
+        class="knob-track"
+        cx="50"
+        cy="50"
+        r="45"
+        :stroke="trackColor"
+        stroke-width="10"
+        fill="none"
+      />
+      <circle
+        class="knob-progress"
+        cx="50"
+        cy="50"
+        r="45"
+        :stroke="progressColor"
+        stroke-width="10"
+        fill="none"
+        :style="{ strokeDasharray: circumference, strokeDashoffset: progressOffset }"
+      />
+    </svg>
+    <div class="knob-value" :style="{ color: valueColor }">{{ currentValue }}</div>
   </div>
 </template>
 
 <script>
-import Input from './components/Input.vue'
-import Selector from './components/Selector.vue'
-import Favorite from './components/Favorite.vue'
-import CryptoConvert from 'crypto-convert';
-
-const convert = new CryptoConvert();
-
 export default {
-  components: { Input, Selector, Favorite },
+  name: "Knob",
+  props: {
+    min: { type: Number, default: 0 },
+    max: { type: Number, default: 100 },
+    size: { type: Number, default: 100 },
+    trackColor: { type: String, default: "#ccc" },
+    progressColor: { type: String, default: "#00f" },
+    valueColor: { type: String, default: "#000" },
+    initial: { type: Number, default: 0 },
+  },
   data() {
     return {
-      amount: 0,
-      cryptoFirst: '',
-      cryptoSecond: '',
-      error: '',
-      result: 0,
-      favs: []
+      currentValue: this.initial,
+      isDragging: false,
+      circumference: 2 * Math.PI * 45, // Radius is 45
     };
   },
+  computed: {
+    progressOffset() {
+      const percentage = (this.currentValue - this.min) / (this.max - this.min);
+      return this.circumference * (1 - percentage);
+    },
+  },
   methods: {
-    changeAmount(val) {
-      this.amount = val;
+    startDrag(event) {
+      this.isDragging = true;
+      document.addEventListener("mousemove", this.handleDrag);
+      document.addEventListener("mouseup", this.stopDrag);
+      document.addEventListener("touchmove", this.handleDrag);
+      document.addEventListener("touchend", this.stopDrag);
     },
-    setCryptoFirst(val) {
-      this.cryptoFirst = val;
-    },
-    setCryptoSecond(val) {
-      this.cryptoSecond = val;
-    },
-    async convert() {
-      if (this.amount <= 0) {
-        this.error = 'Enter amount > 0';
-        return;
-      } else if (this.cryptoFirst == this.cryptoSecond) {
-        this.error = 'First and second currency must differ';
-        return;
-      } else if (this.cryptoFirst == '' || this.cryptoSecond == '') {
-        this.error = 'Choose a currency';
-        return;
-      }
-      this.error = '';
+    handleDrag(event) {
+      if (!this.isDragging) return;
+      const { clientX, clientY } = event.touches ? event.touches[0] : event;
+      const rect = this.$el.getBoundingClientRect();
+      const centerX = rect.left + rect.width / 2;
+      const centerY = rect.top + rect.height / 2;
+      const angle = Math.atan2(clientY - centerY, clientX - centerX) * (180 / Math.PI) + 90;
+      const normalizedAngle = (angle + 360) % 360;
 
-      await convert.ready();
+      const value = Math.round(
+        this.min + ((normalizedAngle / 360) * (this.max - this.min))
+      );
 
-      if (this.cryptoFirst == 'BTC' && this.cryptoSecond == 'ETH')
-        this.result = convert.BTC.ETH(Math.floor(this.amount));
-      else if (this.cryptoFirst == 'BTC' && this.cryptoSecond == 'USD')
-        this.result = convert.BTC.USD(Math.floor(this.amount));
-      else if (this.cryptoFirst == 'ETH' && this.cryptoSecond == 'USD')
-        this.result = convert.ETH.USD(Math.floor(this.amount));
-      else if (this.cryptoFirst == 'ETH' && this.cryptoSecond == 'BTC')
-        this.result = convert.ETH.BTC(Math.floor(this.amount));
-      else if (this.cryptoFirst == 'USD' && this.cryptoSecond == 'BTC')
-        this.result = convert.USD.BTC(Math.floor(this.amount));
-      else if (this.cryptoFirst == 'USD' && this.cryptoSecond == 'ETH')
-        this.result = convert.USD.ETH(Math.floor(this.amount));
+      this.currentValue = Math.max(this.min, Math.min(this.max, value));
+      this.$emit("input", this.currentValue);
     },
-    favorite() {
-      this.favs = [{
-        'from': this.cryptoFirst,
-        'to': this.cryptoSecond
-      }];
+    stopDrag() {
+      this.isDragging = false;
+      document.removeEventListener("mousemove", this.handleDrag);
+      document.removeEventListener("mouseup", this.stopDrag);
+      document.removeEventListener("touchmove", this.handleDrag);
+      document.removeEventListener("touchend", this.stopDrag);
     },
-    getFromFavs(index) {
-      this.cryptoFirst = this.favs[index].from,
-      this.cryptoSecond = this.favs[index].to
-    }
-  }
+  },
 };
 </script>
 
 <style scoped>
-/**/
-  .wrapper {
-    height: 100vh;
-    width: 100%;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-  }
-
-  .wrapper-inner {
-   /* border: 2px solid rgb(83, 24, 187);*/
-    width: 20%;
-  }
-
-  .wrapper-inner-input {
-    display: flex;
-    flex-direction: row;
-    justify-content: space-around;
-    margin: 5px 5px;
-  }
-
-  .wrapper-inner-input input,
-  .wrapper-inner-input button {
-    width: 30%;
-  }
-
-  .selectors {
-    display: flex;
-    justify-content: space-around;
-    margin: 0 auto;
-  }
-
-  h1 {
-    text-align: center;
-    margin-top: 60px;
-    font-size: 10em;
-    opacity: .3;
-  }
-
-  h1 b {
-    opacity: 1 !important;
-    color: rgb(255, 0, 0);
-  }
-
-  video{
-    /*border: 2px solid rgb(83, 24, 187);*/
-  }
-
-
-
-
-  @media screen and (min-width: 992px) {
-    .wrapper-inner {
-      width: 30%;
-    }
-
-    .selectors {
-      justify-content: space-between;
-    }
-
-    h1 {
-      font-size: 10em;
-    }
-
-    video{
-      width:50%;
-    }
-  }
-
-  @media screen and (min-width: 768px) and (max-width: 991px) {
-    .wrapper-inner {
-      width: 70%;
-    }
-
-    .selectors {
-      justify-content: space-around;
-    }
-
-    h1 {
-      font-size: 5em;
-    }
-
-    video{
-      width:90%;
-    }
-  }
-
-  @media screen and (max-width: 767px) {
-    .wrapper-inner {
-      width: 50%;
-    }
-
-    h1 {
-      font-size: 2em;
-    }
-
-    video{
-      width:90%;
-    }
-  }
+.knob {
+  position: relative;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  user-select: none;
+}
+.knob-circle {
+  position: absolute;
+  top: 0;
+  left: 0;
+  transform: rotate(-90deg);
+}
+.knob-track {
+  opacity: 0.3;
+}
+.knob-progress {
+  transition: stroke-dashoffset 0.3s ease;
+}
+.knob-value {
+  font-size: 1.5em;
+  pointer-events: none;
+  z-index: 1;
+}
 </style>
